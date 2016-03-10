@@ -1,0 +1,5 @@
+# priklad z prednasky na odstraneni nedeterminismu (slajd 25)
+( {s, q1, g23o_f, q2, f}, {' ' , 'a', 'b', 'c'}, 
+  {s ' ' -> s, s 'b' -> q1, s 'b' -> f, s 'c' -> q2, s 'c' -> f,
+   q1 'b' -> q1, q1 'b' -> f, q2 'c' -> q2, q2 'c' -> f, f 'a' -> f},
+  s, {f})
