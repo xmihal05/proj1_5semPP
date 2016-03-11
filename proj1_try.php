@@ -148,14 +148,16 @@ function del_whitechar(&$in_file){
 }
 
 function states_check(&$in_file){	
+
 //identifiers of C language 	- must start with letter, can be followd by number
 //				- no special chars except _ in the middle
+
 	//states are empty!!
 	$empty_states = "~\(\{\},\{'~";
 	preg_match($empty_states,$in_file,$error1);
 	if(!empty($error1)) exit(41);
 
-	//find set of states
+	//find set of states and save them into array
 	$find_states = "~\(\{(.*)\},\{'~";
 	preg_match($find_states, $in_file, $all_states);
 	foreach($all_states as $item){
@@ -166,18 +168,33 @@ function states_check(&$in_file){
 		//check if starts with the number
 		$starts_num = "~[a-zA-Z]+[a-zA-Z0-9_]*(*SKIP)(*FAIL)|[0-9]+[a-zA-Z0-9_]*~";
 		preg_match($starts_num, $item, $error2);
-		if(!empty($error2)) exit(40);
+		if(!empty($error2)){
+			echo "state starts with number\n";
+			exit(40);
+		}
 
 		//check for special chars
-		$special_char = "~.*\..*|.*\,.*|.*\?.*|.*\!.*|~"; //dokoncit specialne znaky!!
+		$special_char = "~.*\!.*|.*\@.*|.*\#.*|.*\%.*|.*\^.*|
+				.*\&.*|.*\*.*|.*\..*|.*;.*|.*\'.*|.*\?.*|
+				.*\-.*|.*\+.*|.*\=.*|.*\/.*|.*\|.*|.*\~.*~"; // $, /, " pridat!!!! 
+		preg_match($special_char,$item,$error3);
+		if(!empty($error3)){
+			echo "state include special character\n";
+			exit(40);
+		}
 
 		//check if state isnt *_state_*
 		$wrong_syn = "~.+_+.+(*SKIP)(*FAIL)|_*.+_+|_+.+_*~";		
-		preg_match($wrong_syn, $item,$error2);
-		if(!empty($error2)) exit(40);
+		preg_match($wrong_syn, $item,$error4);
+		if(!empty($error4)){
+			echo "state starts or ends with _\n";
+			exit(40);
+		}
 	}
 
+	$GLOBALS['states_arr'] = $state;
 }
+
 /***********************************************************/
 /*************		MAIN 		********************/
 /***********************************************************/
@@ -199,8 +216,12 @@ $fail_text = "~\(\{.*\}\)(*SKIP)(*FAIL)|.+~";
 preg_match($fail_text, $in, $error);
 if(!empty($error)) exit(40);
 
-//separate set of states and check them
+//parse input file
 states_check($in);
+//function to parse vstupnu abecedu (prechody)
+//function to parse rules
+//get starting state
+//get set of finite states
 
 //copy $in file to $out file and close files
 fwrite($out, $in);
