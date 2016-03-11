@@ -82,7 +82,6 @@ function pars_params($argc, $argv){
 	if($argc > 5){
 		echo "too many parameters!\n";
 		print_err(1);
-		;
 	}
 	//check wrong combinations
 	if($argc >= 2){ 
@@ -160,9 +159,8 @@ function states_check(&$in_file){
 	//find set of states and save them into array
 	$find_states = "~\(\{(.*)\},\{'~";
 	preg_match($find_states, $in_file, $all_states);
-	foreach($all_states as $item){
-		$state = preg_split("~,~", $item);
-	}
+	if(empty($all_states)) echo "no states found!!!\n";
+	foreach($all_states as $item) $state = preg_split("~,~", $item);
 
 	foreach($state as $item){
 		//check if starts with the number
@@ -195,6 +193,26 @@ function states_check(&$in_file){
 	$GLOBALS['states_arr'] = $state;
 }
 
+function finstates_check(&$in_file){ //find finite states and check them
+
+	//finite states are empty
+	$fin_empty = "~,\{.*\},(*SKIP)(*FAIL)|,\{\}\)~";
+	preg_match($fin_empty,$in_file,$error1);
+	if(!empty($error1)) echo "no finite state found!\n";
+
+	//find finite states
+	$fin_states = "~,\{.*\},(*SKIP)(*FAIL)|,\{(.*)\}\)~";
+	preg_match($fin_states,$in_file,$all_finites);
+	if(empty($all_finites)) echo "no finite state found!!!\n";
+	//save finite sates into array - split them by ,
+	foreach($all_finites as $item) $finites = preg_split("~,~", $item);
+
+	//check if every finite state was included in all states
+	$includes_all = count(array_intersect($finites, $GLOBALS['states_arr'])) ==
+			count($finites);
+	if(!$includes_all) exit(41);
+}
+
 /***********************************************************/
 /*************		MAIN 		********************/
 /***********************************************************/
@@ -213,15 +231,19 @@ pars_params($argc, $argv);
 del_whitechar($in);
 //check for text behind paranthesis
 $fail_text = "~\(\{.*\}\)(*SKIP)(*FAIL)|.+~";
-preg_match($fail_text, $in, $error);
-if(!empty($error)) exit(40);
+preg_match($fail_text, $in, $error1);
+if(!empty($error1)) exit(40);
+//check for wrong use of ,
+$wrong_col = "~\{,|,\}|,,~";
+preg_match($wrong_col,$in,$error2);
+if(!empty($error2)) exit(40);
 
 //parse input file
 states_check($in);
 //function to parse vstupnu abecedu (prechody)
 //function to parse rules
 //get starting state
-//get set of finite states
+finstates_check($in);
 
 //copy $in file to $out file and close files
 fwrite($out, $in);
