@@ -142,8 +142,14 @@ function del_whitechar(&$in_file){
 	$in_file = preg_replace($find_comments, "", $in_file);
 
 	//find comma in the alphabet and replace it with special char
-	$find_comma = "~\s(','),\s|\{(','),\s|\s(',')\}|\s(',')\s->~";
-	$in_file = preg_replace($find_comma, "'comma'", $in_file);
+	$find_comma_beg = "~\{(','),\s~";
+	$find_comma_end = "~\s(',')\}~";
+	$find_comma_mid = "~\s(','),\s~";
+	$find_comma_rule = "~\s(',')\s->~";
+	$in_file = preg_replace($find_comma_beg, "{'comma', ", $in_file);
+	$in_file = preg_replace($find_comma_end, " 'comma'}", $in_file);
+	$in_file = preg_replace($find_comma_mid, " 'comma', ", $in_file);
+	$in_file = preg_replace($find_comma_rule, " 'comma' ->", $in_file);
 
 	//find white characters and delete them
 	$find_space = "~'\s+'(*SKIP)(*FAIL)|\s~";
@@ -165,7 +171,7 @@ function states_check(&$in_file){
 	preg_match($find_states, $in_file, $all_states);
 	if(empty($all_states)) exit(40); 
 	foreach($all_states as $item) $state = preg_split("~,~", $item);
-
+	
 	foreach($state as $item){
 		//check if starts with the number
 		$starts_num = "~[a-zA-Z]+[a-zA-Z0-9_]*(*SKIP)(*FAIL)|[0-9]+[a-zA-Z0-9_]*~";
@@ -282,7 +288,7 @@ function rules_check(&$in_file){
 	if(!$include_all_states) exit(41);
 
 	//check alphabet used in rules
-	$get_alphabeth = "~[a-zA-Z0-9_]+('.*')->[a-zA-Z0-9_]~";
+	$get_alphabeth = "~[a-zA-Z0-9_]+('.*')->[a-zA-Z0-9_]+~";
 	foreach($rules as $key => $value)
 		preg_match($get_alphabeth,$value,$rules_alph[$key]);
 	//save all the matches into one array
@@ -450,7 +456,6 @@ if(!empty($error2)) exit(40);
 states_check($in);
 alph_check($in);
 rules_check($in);
-echo $in;
 initstate_check($in);
 finstates_check($in);
 
@@ -459,8 +464,7 @@ if($GLOBALS['e']) echo "zmaz epsilon prechody!\n";
 else if($GLOBALS['d']) echo "vykonaj determinizaciu\n";
 else normal_form($out);	//output in normal form
 
-//copy $in file to $out file and close files
-//fwrite($out, $in);
+//close file
 fclose($out);
 
 ?>
