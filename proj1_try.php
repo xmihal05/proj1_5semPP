@@ -204,6 +204,7 @@ function states_check(&$in_file){
 	}
 
 	//save parsed states into global variable
+	sort($state);
 	$GLOBALS['states_arr'] = $state;
 }
 
@@ -228,6 +229,7 @@ function alph_check(&$in_file){
 	}
 
 	//save alphabet into global variable
+	sort($alphabet);
 	$GLOBALS['alphabet_arr'] = $alphabet;
 }
 
@@ -321,6 +323,7 @@ function rules_check(&$in_file){
 	if(!$include_all_alph) exit(41);
 
 	//save rules into global variable
+	sort($rules);
 	$GLOBALS['rules_arr'] = $rules;
 	rules_end:;
 }
@@ -354,6 +357,7 @@ function finstates_check(&$in_file){ //find finite states and check them
 	if(!$includes_all) exit(41);
 
 	//save parsed finite states into global variable
+	sort($finites);
 	$GLOBALS['fin_arr'] = $finites;
 	fin_end:;
 }
@@ -401,6 +405,7 @@ function normal_form(&$out_file){
 
 	//print states into outfile
 	fwrite($out_file,"{");
+//	sort($states);
 	foreach($states as $key => $value){
 		if((count($states) - 1) == $key)	//last in the array
 			fwrite($out_file, "$value},\n");
@@ -409,6 +414,7 @@ function normal_form(&$out_file){
 
 	//print alphabet into outfile
 	fwrite($out_file,"{");
+//	sort($alph);
 	foreach($alph as $key => $value){
 		if((count($alph) - 1) == $key){
 			if($value == "'comma'")
@@ -427,6 +433,7 @@ function normal_form(&$out_file){
 	//parse rules into beginig states, alphabet and end states
 	$rules_split = "~([a-zA-Z0-9_]+)'(.*)'->([a-zA-Z0-9_]+)~";
 	if(!$GLOBALS['R_empty']){
+//		sort($rules);
 		foreach($rules as $key => $value){
 			preg_match($rules_split, $value, $split_array[$key]);
 		}
@@ -454,6 +461,7 @@ function normal_form(&$out_file){
 	//print finite states into outfile
 	fwrite($out_file,"{");
 	if(!$GLOBALS['F_empty']){
+//		sort($fin);
 		foreach($fin as $key => $value){
 			if((count($fin) - 1) == $key)
 				fwrite($out_file, "$value}\n");
