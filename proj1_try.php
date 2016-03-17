@@ -10,11 +10,8 @@ $e = false;
 $input = false;
 $output = false;
 $i = false;
-//$wchar = false;
-//$rules = false;
-//$astring = false;
-//$wsfa = false;
-$no_params = false;
+$R_empty = false;
+$F_empty = false;
 
 //print help
 $hlp_str = <<<EOD
@@ -239,8 +236,10 @@ function rules_check(&$in_file){
 	//rules empty
 	$rules_empty = "~\(\{.*\},\{.*\},\{\},[a-zA-Z0-9_],\{.*\}\)~";
 	preg_match($rules_empty,$in_file,$error1);
-	if(!empty($error1)) exit(40);
-
+	if(!empty($error1)){
+		$GLOBALS['R_empty'] = true;
+		goto rules_end;
+	}
 	//find rules and parse them
 	$match_rules = "~\(\{.*\},\{.*\},\{(.*)\},[a-zA-Z0-9_]+,\{.*\}\)~";
 	preg_match($match_rules,$in_file,$all_rules);
@@ -323,6 +322,7 @@ function rules_check(&$in_file){
 
 	//save rules into global variable
 	$GLOBALS['rules_arr'] = $rules;
+	rules_end:;
 }
 
 function finstates_check(&$in_file){ //find finite states and check them
@@ -330,7 +330,10 @@ function finstates_check(&$in_file){ //find finite states and check them
 	//finite states are empty
 	$fin_empty = "~,\{.*\},(*SKIP)(*FAIL)|,\{\}\)~";
 	preg_match($fin_empty,$in_file,$error1);
-	if(!empty($error1)) exit(40);
+	if(!empty($error1)){
+		$GLOBALS['F_empty'] = true;
+		goto fin_end;
+	}
 
 	//find finite states
 	$fin_states = "~,\{.*\},(*SKIP)(*FAIL)|,\{(.*)\}\)~";
@@ -352,6 +355,7 @@ function finstates_check(&$in_file){ //find finite states and check them
 
 	//save parsed finite states into global variable
 	$GLOBALS['fin_arr'] = $finites;
+	fin_end:;
 }
 
 function initstate_check(&$in_file){
@@ -383,11 +387,15 @@ function initstate_check(&$in_file){
 
 function normal_form(&$out_file){
 
+	$i = 0;
+
 	$states = $GLOBALS['states_arr'];
 	$alph = $GLOBALS['alphabet_arr'];
-	$rules = $GLOBALS['rules_arr'];
+	if(!$GLOBALS['R_empty'])
+		$rules = $GLOBALS['rules_arr'];
 	$init = $GLOBALS['init_state'];
-	$fin = $GLOBALS['fin_arr'];
+	if(!$GLOBALS['F_empty'])
+		$fin = $GLOBALS['fin_arr'];
 	
 	fwrite($out_file,"(\n");
 
@@ -402,13 +410,42 @@ function normal_form(&$out_file){
 	//print alphabet into outfile
 	fwrite($out_file,"{");
 	foreach($alph as $key => $value){
-		if((count($alph) - 1) == $key)
-			fwrite($out_file, "$value},\n");
-		else fwrite($out_file, "$value, ");
+		if((count($alph) - 1) == $key){
+			if($value == "'comma'")
+				fwrite($out_file, "','},\n");
+			else fwrite($out_file, "$value},\n");
+		}
+		else{
+			if($value == "'comma'")
+				fwrite($out_file, "',', ");
+			 fwrite($out_file, "$value, ");
+		}
 	}
 
 	//print rules into outfile
-	fwrite($out_file,"{\n");		
+	fwrite($out_file,"{\n");
+	//parse rules into beginig states, alphabet and end states
+	$rules_split = "~([a-zA-Z0-9_]+)'(.*)'->([a-zA-Z0-9_]+)~";
+	if(!$GLOBALS['R_empty']){
+		foreach($rules as $key => $value){
+			preg_match($rules_split, $value, $split_array[$key]);
+		}
+		//print out rules
+		foreach($split_array as $item){
+			foreach($item as $key => $value){
+				if($key == "1")
+					fwrite($out_file, "$value ");
+				else if($key == "2"){
+					if($value == "comma")
+						fwrite($out_file, "',' -> ");
+					else fwrite($out_file, "'$value' -> ");
+				}
+				else if($key == "3")
+					fwrite($out_file, "$value,\n");
+				else continue;
+			}
+		}
+	}
 	fwrite($out_file,"},\n");	
 
 	//print initial state
@@ -416,13 +453,14 @@ function normal_form(&$out_file){
 
 	//print finite states into outfile
 	fwrite($out_file,"{");
-	foreach($fin as $key => $value){
-		if((count($fin) - 1) == $key)
-			fwrite($out_file, "$value}\n");
-		else fwrite($out_file, "$value, ");
+	if(!$GLOBALS['F_empty']){
+		foreach($fin as $key => $value){
+			if((count($fin) - 1) == $key)
+				fwrite($out_file, "$value}\n");
+			else fwrite($out_file, "$value, ");
+		}
 	}
-	
-
+	else fwrite($out_file, "}\n");
 	fwrite($out_file,")\n");
 
 }
@@ -466,5 +504,4 @@ else normal_form($out);	//output in normal form
 
 //close file
 fclose($out);
-
 ?>
