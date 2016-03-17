@@ -473,11 +473,11 @@ pars_params($argc, $argv);
 //open files
 	if($GLOBALS['input'])
 		$in = file_get_contents($GLOBALS['input_file']) or exit(2);
-	else echo "read from standard input\n";
+	else $in = fgets(STDIN);
 
 	if($GLOBALS['output'])
 		$out = fopen($GLOBALS['output_file'], "w") or exit(3);
-	else echo "print on standard output\n";
+	else $out = STDOUT;
 
 //delete comments and white characters
 del_whitechar($in);
