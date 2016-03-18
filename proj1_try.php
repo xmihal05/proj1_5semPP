@@ -37,27 +37,13 @@ EOD;
 /*************		FUNCTIONS	********************/
 /***********************************************************/
 
-function print_err($err_no){
-	if($err_no == 1)
-		exit(1);
-	else if($err_no == 2)
-		exit(2);
-	else if($err_no == 3)
-		exit(3);
-	else if($err_no == 40)
-		exit(40);
-	else if($err_no == 41)
-		exit(41);
-	else echo "Wrong error returning value\n";
-}
-
 function pars_params($argc, $argv){	
+	//short options for argument pars
 	$shortopts = "d";
 	$shortopts .= "i";
 	$shortopts .= "e";
-//	$shortopts .= "w";	//white char - rozsirenie
-//	$shortopts .= "r";	//rules only
-
+	
+	//longoptions for argument parse (--smth)
 	$longopts = array(
 			"help", 
 			"input:", 
@@ -65,21 +51,21 @@ function pars_params($argc, $argv){
 			"no-epsilon-rules", 
 			"case-insensitive",
 			"determinization",
-//			"white-char", 
-//			"rules-only", 
-//			"analyze-string:", 
-//			"wsfa"
 			);
 
 	$params = getopt($shortopts, $longopts);
-	//var_dump($params);	!!!!!!!!!CHECK FOR ARRAYS (is_array) !!!!!
 	
 	//CHECK RIGHT USE OF PARAMETERS
-	//too many parameters
-	if($argc > 5){
-		echo "too many parameters!\n";
-		print_err(1);
+	//check quantity of parameters
+	$d_count = $e_count = $i_count = $in_count = $out_count = $h_count = 0;
+	foreach($params as $item){
+		if(is_array($item))	//if param is array = was used more than once
+			exit(1);
 	}
+
+	//too many parameters
+	if($argc > 5)
+		exit(1);
 	//check wrong combinations
 	if($argc >= 2){ 
 		if(!array_key_exists("help",$params) && !array_key_exists("input",$params)
@@ -87,30 +73,30 @@ function pars_params($argc, $argv){
 		&& !array_key_exists("no-epsilon-rules",$params) && !array_key_exists("d",$params)
 		&& !array_key_exists("determinization",$params) && !array_key_exists("i",$params)
 		&& !array_key_exists("case-insensitive",$params))
-			print_err(1);
+			exit(1);
 		else{
 			if (array_key_exists("help", $params)){
 				if(count($argv) != 2)	//another parameter used with help
-					print_err(1);
+					exit(1);
 				else{	//print help and exit
 					echo $GLOBALS['hlp_str'];
 					exit(0);
 				}
 			}
 			if(array_key_exists("e",$params)&&array_key_exists("no-epsilon-rules",$params))
-				print_err(1);
+				exit(1);
 			if(array_key_exists("e",$params) || array_key_exists("no-epsilon-rules",$params)){
 				if((array_key_exists("d",$params)==true) || 
 					(array_key_exists("determinization", $params)==true))
-					print_err(1);
+					exit(1);
 				$GLOBALS['e'] = true;
 			}
 			if(array_key_exists("d",$params) && array_key_exists("determinization",$params))
-				print_err(1);
+				exit(1);
 			if(array_key_exists("d",$params) ||  array_key_exists("determinization",$params))
 				$GLOBALS['d'] = true;
 			if(array_key_exists("i",$params) && array_key_exists("case-insensitive",$params))
-				print_err(1);
+				exit(1);
 			if(array_key_exists("i",$params) || array_key_exists("case-insensitive",$params))
 				$GLOBALS['i'] = true;
 		}
@@ -126,8 +112,6 @@ function pars_params($argc, $argv){
 			$GLOBALS['output_file'] = $option;
 			$GLOBALS['output'] = true;
 		}
-//		else if($key == "analyze-string")
-//			$a_string = $option;
 	}
 
 
@@ -139,10 +123,10 @@ function del_whitechar(&$in_file){
 	$in_file = preg_replace($find_comments, "", $in_file);
 
 	//find comma in the alphabet and replace it with special char
-	$find_comma_beg = "~\{(','),\s~";
-	$find_comma_end = "~\s(',')\}~";
-	$find_comma_mid = "~\s(','),\s~";
-	$find_comma_rule = "~\s(',')\s->~";
+	$find_comma_beg = "~\{(','),\s~";	//comma in the beginning
+	$find_comma_end = "~\s(',')\}~";	//in the end
+	$find_comma_mid = "~\s(','),\s~";	//somewhere in the middle
+	$find_comma_rule = "~\s(',')\s->~";	//used in rule
 	$in_file = preg_replace($find_comma_beg, "{'comma', ", $in_file);
 	$in_file = preg_replace($find_comma_end, " 'comma'}", $in_file);
 	$in_file = preg_replace($find_comma_mid, " 'comma', ", $in_file);
@@ -162,39 +146,30 @@ function states_check(&$in_file){
 	$empty_states = "~\(\{\},\{'~";
 	preg_match($empty_states,$in_file,$error1);
 	if(!empty($error1)) exit(41);
+	
+	//find wrong use of comma
+	$wrong_comma = "~\(\{.*,,.*\},\{'*~";
+	preg_match($wrong_comma, $in_file, $comma_error);
+	if(!empty($comma_error)) exit(40);
 
 	//find set of states and save them into array
-	$find_states = "~\(\{(.*)\},\{'~";
+	$find_states = "~\(\{([a-zA-Z0-9_,]*)\}~";
 	preg_match($find_states, $in_file, $all_states);
-	if(empty($all_states)) exit(40); 
+	if(empty($all_states)) exit(40);
 	foreach($all_states as $item) $state = preg_split("~,~", $item);
 	
 	foreach($state as $item){
 		//check if starts with the number
 		$starts_num = "~[a-zA-Z]+[a-zA-Z0-9_]*(*SKIP)(*FAIL)|[0-9]+[a-zA-Z0-9_]*~";
 		preg_match($starts_num, $item, $error2);
-		if(!empty($error2)){
-			echo "state starts with number\n";
+		if(!empty($error2))
 			exit(40);
-		}
-
-		//check for special chars
-		$special_char = "~.*\!.*|.*\@.*|.*\#.*|.*\%.*|.*\^.*|
-				.*\&.*|.*\*.*|.*\..*|.*;.*|.*\'.*|.*\?.*|
-				.*\-.*|.*\+.*|.*\=.*|.*\/.*|.*\|.*|.*\~.*~"; // $, /, " pridat!!!! 
-		preg_match($special_char,$item,$error3);
-		if(!empty($error3)){
-			echo "state include special character\n";
-			exit(40);
-		}
 
 		//check if state isnt *_state_*
 		$wrong_syn = "~.+_+.+(*SKIP)(*FAIL)|_*.+_+|_+.+_*~";		
-		preg_match($wrong_syn, $item,$error4);
-		if(!empty($error4)){
-			echo "state starts or ends with _\n";
+		preg_match($wrong_syn, $item,$error3);
+		if(!empty($error3))
 			exit(40);
-		}
 	}
 	
 	//change every character to lower case if requested
@@ -204,7 +179,7 @@ function states_check(&$in_file){
 	}
 
 	//save parsed states into global variable
-	sort($state);
+	sort($state);	//sort <
 	$GLOBALS['states_arr'] = $state;
 }
 
@@ -229,7 +204,7 @@ function alph_check(&$in_file){
 	}
 
 	//save alphabet into global variable
-	sort($alphabet);
+	sort($alphabet); //sort <
 	$GLOBALS['alphabet_arr'] = $alphabet;
 }
 
@@ -239,13 +214,13 @@ function rules_check(&$in_file){
 	$rules_empty = "~\(\{.*\},\{.*\},\{\},[a-zA-Z0-9_],\{.*\}\)~";
 	preg_match($rules_empty,$in_file,$error1);
 	if(!empty($error1)){
-		$GLOBALS['R_empty'] = true;
-		goto rules_end;
+		$GLOBALS['R_empty'] = true;	//empty rules are valid
+		goto rules_end;	
 	}
 	//find rules and parse them
 	$match_rules = "~\(\{.*\},\{.*\},\{(.*)\},[a-zA-Z0-9_]+,\{.*\}\)~";
 	preg_match($match_rules,$in_file,$all_rules);
-	if(empty($all_rules)) exit(40);
+	if(empty($all_rules)) exit(40);	//syntax error in finite state machine
 	foreach($all_rules as $item) $rules = preg_split("~,~", $item);
 
 	//change to lower case if requested 
@@ -273,8 +248,9 @@ function rules_check(&$in_file){
 	$mg = 1;
 	foreach($parsed_states as $key => $value_p){
 		foreach($merged_states as $item => $value_m){
-			if($value_p != $value_m){	//hodnoty poly sa nerovnaju
-				if($item == (count($merged_states) - 1)){ //je posledny kluc
+			//save into array if value is different
+			if($value_p != $value_m){
+				if($item == (count($merged_states) - 1)){ //last key
 					$merged_states[$mg] = $value_p;
 					$mg = $mg + 1;
 				}
@@ -283,7 +259,7 @@ function rules_check(&$in_file){
 			else break;
 		}
 	}
-	//check if all the states were stated in all states array
+	//check if all the states were defined all states array
 	$include_all_states = count(array_intersect($merged_states, $GLOBALS['states_arr']))
 				== count($merged_states);
 	if(!$include_all_states) exit(41);
@@ -309,8 +285,8 @@ function rules_check(&$in_file){
 		foreach($merged_alph as $item => $value_m){
 			if($value_p == "''")
 				break;
-			if($value_p != $value_m){	//hodnoty poly sa nerovnaju
-				if($item == (count($merged_alph) - 1)){ //je posledny kluc
+			if($value_p != $value_m){	
+				if($item == (count($merged_alph) - 1)){ //last key
 					$merged_alph[$mg1] = $value_p;
 					$mg1 = $mg1 + 1;
 				}
@@ -325,7 +301,7 @@ function rules_check(&$in_file){
 	if(!$include_all_alph) exit(41);
 
 	//save rules into global variable
-	sort($rules);
+	sort($rules); //sort <
 	$GLOBALS['rules_arr'] = $rules;
 	rules_end:;
 }
@@ -336,7 +312,7 @@ function finstates_check(&$in_file){ //find finite states and check them
 	$fin_empty = "~,\{.*\},(*SKIP)(*FAIL)|,\{\}\)~";
 	preg_match($fin_empty,$in_file,$error1);
 	if(!empty($error1)){
-		$GLOBALS['F_empty'] = true;
+		$GLOBALS['F_empty'] = true;	//empty finites are valid
 		goto fin_end;
 	}
 
@@ -359,7 +335,7 @@ function finstates_check(&$in_file){ //find finite states and check them
 	if(!$includes_all) exit(41);
 
 	//save parsed finite states into global variable
-	sort($finites);
+	sort($finites); //sort <
 	$GLOBALS['fin_arr'] = $finites;
 	fin_end:;
 }
@@ -391,10 +367,14 @@ function initstate_check(&$in_file){
 	$GLOBALS['init_state'] = $initial;
 }
 
-function normal_form(&$out_file){
+function normal_form(){
 
-	$i = 0;
+	//opens output file
+	if($GLOBALS['output'])
+		$out_file = fopen($GLOBALS['output_file'], "w") or exit(3);
+	else $out_file = STDOUT;
 
+	//save global variables into local for quicker use
 	$states = $GLOBALS['states_arr'];
 	$alph = $GLOBALS['alphabet_arr'];
 	if(!$GLOBALS['R_empty'])
@@ -403,6 +383,7 @@ function normal_form(&$out_file){
 	if(!$GLOBALS['F_empty'])
 		$fin = $GLOBALS['fin_arr'];
 	
+	//BEGINING OF OUTPUT
 	fwrite($out_file,"(\n");
 
 	//print states into outfile
@@ -447,12 +428,12 @@ function normal_form(&$out_file){
 				if($key == "1")
 					fwrite($out_file, "$value ");
 				else if($key == "2"){
-					if($value == "comma")
+					if($value == "comma")	//if comma found replace with ,
 						fwrite($out_file, "',' -> ");
 					else fwrite($out_file, "'$value' -> ");
 				}
 				else if($key == "3"){
-					if($i == count($split_array))
+					if($i == count($split_array))	//dont print , behind last rule!
 						fwrite($out_file, "$value\n");
 					else fwrite($out_file, "$value,\n");
 				}
@@ -477,6 +458,7 @@ function normal_form(&$out_file){
 	}
 	else fwrite($out_file, "}\n");
 	fwrite($out_file,")");
+	//END OF OUTPUT
 
 	//close file
 	fclose($out_file);
@@ -488,10 +470,11 @@ function del_epsilon(&$out_file){
 	$j = 1;
 	$save_this = false;
 
-	if($GLOBALS['R_empty'])
+	if($GLOBALS['R_empty'])	//rules are empty = write output
 		normal_form($out_file);
 	$rules = $GLOBALS['rules_arr'];
 
+	//split rules (p)(a)->(q)
 	$rules_split = "~([a-zA-Z0-9_]+)('.*')->([a-zA-Z0-9_]+)~";
 	foreach($rules as $item => $value){
 		preg_match($rules_split, $value, $split_array[$item]);
@@ -510,7 +493,7 @@ function del_epsilon(&$out_file){
 		}
 	}
 
-	//if no epsilon transitions found
+	//if no epsilon transitions found => print out output
 	if(empty($eps_arr)) normal_form($out_file);
 
 	$save_this=false;
@@ -547,23 +530,24 @@ function del_epsilon(&$out_file){
 		foreach($item as $key => $value){
 			if($key == "1"){
 				$start_char = $value;
-				$push_char = $value;
+				$push_char = $value;	//push first value into string
 			}
 			else if($key == "2"){
-				if($value == "''")
+				if($value == "''")	//epsilon rule found
 					$save_this = true;
-				else $push_char .= "$value->";
+				else $push_char .= "$value->";	//append transition into string
 			}
 			else if($key == "3"){
 				if(!$save_this){
-					$push_char .= $value;
+					$push_char .= $value;	//append last value into string
 					$push_string = true;
 				}
-				else{
+				else{	//if epsilon found continue
 					$index = $value;
 					foreach($eps_states as $state_item => $s_val){
 						if($state_item == $index){
 						$smth1 = $s_val[$o];
+							//save non epsilon rules into array
 							foreach($eps_transitions as $tran_item => $t_val){
 								if($tran_item == $index){
 									while($o < count($s_val)){
@@ -584,7 +568,7 @@ function del_epsilon(&$out_file){
 					$save_this = false;
 				}
 			}
-			if($push_string){
+			if($push_string){	//push string into rules array
 				$new_rules[$i] = $push_char;
 				$i++;
 				$push_string = false;
@@ -592,8 +576,8 @@ function del_epsilon(&$out_file){
 			else continue;
 		}
 	}
-	sort($new_rules);
-	$GLOBALS['rules_arr'] = $new_rules;
+	sort($new_rules);	//sort <
+	$GLOBALS['rules_arr'] = $new_rules;	//save new rules into global variable
 }
 
 /***********************************************************/
@@ -601,14 +585,10 @@ function del_epsilon(&$out_file){
 /***********************************************************/
 
 pars_params($argc, $argv);
-//open files
-	if($GLOBALS['input'])
+//read input 
+	if($GLOBALS['input'])	//--input param as used
 		$in = file_get_contents($GLOBALS['input_file']) or exit(2);
-	else $in = fgets(STDIN);
-
-	if($GLOBALS['output'])
-		$out = fopen($GLOBALS['output_file'], "w") or exit(3);
-	else $out = STDOUT;
+	else $in = fgets(STDIN);	//read from standard input
 
 //delete comments and white characters
 del_whitechar($in);
@@ -622,15 +602,15 @@ preg_match($wrong_col,$in,$error2);
 if(!empty($error2)) exit(40);
 
 //parse input file
-states_check($in);
-alph_check($in);
-rules_check($in);
-initstate_check($in);
-finstates_check($in);
+states_check($in);	//set of states
+alph_check($in);	//input characters
+rules_check($in);	//rules
+initstate_check($in);	//initial state
+finstates_check($in);	//finite states
 
-//Call function for output
-if($GLOBALS['e']) del_epsilon($out);	//erase epsilon transitions
-//else if($GLOBALS['d']) echo "vykonaj determinizaciu\n";
-normal_form($out);	//output in normal form
+//Call functions for output
+if($GLOBALS['e']) del_epsilon();	//erase epsilon transitions
+//else if($GLOBALS['d']) determinization($out);
+normal_form();	//output in normal form
 
 ?>
