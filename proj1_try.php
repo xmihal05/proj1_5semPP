@@ -307,6 +307,8 @@ function rules_check(&$in_file){
 	$mg1 = 1;
 	foreach($parsed_alph as $key => $value_p){
 		foreach($merged_alph as $item => $value_m){
+			if($value_p == "''")
+				break;
 			if($value_p != $value_m){	//hodnoty poly sa nerovnaju
 				if($item == (count($merged_alph) - 1)){ //je posledny kluc
 					$merged_alph[$mg1] = $value_p;
@@ -318,8 +320,8 @@ function rules_check(&$in_file){
 		}
 	}
 	//check if everything was defined in initial alphabeth
-	$include_all_alph = count(array_intersect($merged_alph, $GLOBALS['alphabet_arr'])) ==
-				count($merged_alph);
+	$include_all_alph = count(array_intersect($merged_alph, 
+			$GLOBALS['alphabet_arr'])) == count($merged_alph);
 	if(!$include_all_alph) exit(41);
 
 	//save rules into global variable
@@ -437,8 +439,10 @@ function normal_form(&$out_file){
 		foreach($rules as $key => $value){
 			preg_match($rules_split, $value, $split_array[$key]);
 		}
+		$i = 0;
 		//print out rules
 		foreach($split_array as $item){
+			$i++;
 			foreach($item as $key => $value){
 				if($key == "1")
 					fwrite($out_file, "$value ");
@@ -447,8 +451,11 @@ function normal_form(&$out_file){
 						fwrite($out_file, "',' -> ");
 					else fwrite($out_file, "'$value' -> ");
 				}
-				else if($key == "3")
-					fwrite($out_file, "$value,\n");
+				else if($key == "3"){
+					if($i == count($split_array))
+						fwrite($out_file, "$value\n");
+					else fwrite($out_file, "$value,\n");
+				}
 				else continue;
 			}
 		}
@@ -469,8 +476,124 @@ function normal_form(&$out_file){
 		}
 	}
 	else fwrite($out_file, "}\n");
-	fwrite($out_file,")\n");
+	fwrite($out_file,")");
 
+	//close file
+	fclose($out_file);
+	exit(0);
+}
+
+function del_epsilon(&$out_file){
+	$i = $o = 0;
+	$j = 1;
+	$save_this = false;
+
+	if($GLOBALS['R_empty'])
+		normal_form($out_file);
+	$rules = $GLOBALS['rules_arr'];
+
+	$rules_split = "~([a-zA-Z0-9_]+)('.*')->([a-zA-Z0-9_]+)~";
+	foreach($rules as $item => $value){
+		preg_match($rules_split, $value, $split_array[$item]);
+	}
+	//find epsilon transitions and save their fin states into array
+	foreach($split_array as $item){
+		foreach($item as $key => $value){
+			if($key == "2"){
+				if($value == "''")
+					$save_this = true;
+			}
+			if($key == "3" && $save_this){
+				$eps_arr[$value] = "$value";
+				$save_this=false;
+			}
+		}
+	}
+
+	//if no epsilon transitions found
+	if(empty($eps_arr)) normal_form($out_file);
+
+	$save_this=false;
+	//find transition to replace epsilon
+	foreach($eps_arr as $key_e => $val_e){
+		$append_e = $val_e;
+		$append_t = "";
+		foreach($split_array as $item){
+			foreach($item as $key => $val_s){
+				if($key == "1" && $val_s == $val_e)
+					$save_this=true;
+				if($key == "2" && $save_this)
+					$append_t .= ",$val_s";
+				if($key == "3" && $save_this){
+					if($val_s != $val_e)
+						$append_e .= ",$val_s";
+					$save_this = false;
+				}
+			}
+		}
+		$eps_arr[$val_e] = $append_e;
+		$eps_trans[$val_e] = $append_t;
+	}
+	//save transitions and states into arrays
+	foreach($eps_arr as $item => $value) 
+		$eps_states[$item] = preg_split("~,~",$value);
+	foreach($eps_trans as $item => $value)
+			$eps_transitions[$item] = preg_split("~,~", $value);
+	
+	//save new rules
+	$save_this = false;
+	$push_string = false;
+	foreach($split_array as $item){
+		foreach($item as $key => $value){
+			if($key == "1"){
+				$start_char = $value;
+				$push_char = $value;
+			}
+			else if($key == "2"){
+				if($value == "''")
+					$save_this = true;
+				else $push_char .= "$value->";
+			}
+			else if($key == "3"){
+				if(!$save_this){
+					$push_char .= $value;
+					$push_string = true;
+				}
+				else{
+					$index = $value;
+					foreach($eps_states as $state_item => $s_val){
+						if($state_item == $index){
+						$smth1 = $s_val[$o];
+							foreach($eps_transitions as $tran_item => $t_val){
+								if($tran_item == $index){
+									while($o < count($s_val)){
+										$tran = $t_val[$j];
+										$end = $s_val[$o];
+										$push_char = "$start_char$tran->$end";
+										$new_rules[$i] = $push_char;
+										$i++;
+										$o++;
+										$j++;
+									}
+								}
+							}
+						}
+					}
+					$j = 1;
+					$o = 0;
+					$save_this = false;
+				}
+			}
+			if($push_string){
+				$new_rules[$i] = $push_char;
+				$i++;
+				$push_string = false;
+			}
+			else continue;
+		}
+	}
+	sort($new_rules);
+	$GLOBALS['rules_arr'] = $new_rules;
 }
 
 /***********************************************************/
@@ -506,10 +629,8 @@ initstate_check($in);
 finstates_check($in);
 
 //Call function for output
-if($GLOBALS['e']) echo "zmaz epsilon prechody!\n";
-else if($GLOBALS['d']) echo "vykonaj determinizaciu\n";
-else normal_form($out);	//output in normal form
+if($GLOBALS['e']) del_epsilon($out);	//erase epsilon transitions
+//else if($GLOBALS['d']) echo "vykonaj determinizaciu\n";
+normal_form($out);	//output in normal form
 
-//close file
-fclose($out);
 ?>
